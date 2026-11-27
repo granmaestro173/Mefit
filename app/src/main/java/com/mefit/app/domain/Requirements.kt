@@ -28,7 +28,7 @@ object Requirements {
             setOf(BENCH),
             "Bench_Dips", "Bench_Jump", "Flat_Bench_Leg_Pull-In", "Flat_Bench_Lying_Leg_Raise",
             "Seated_Flat_Bench_Leg_Pull-In", "Seated_Leg_Tucks", "Flutter_Kicks", "Push-Ups_With_Feet_Elevated",
-            "Step-up_with_Knee_Raise", "Incline_Push-Up", "On-Your-Back_Quad_Stretch",
+            "Step-up_with_Knee_Raise", "Incline_Push-Up", "On-Your-Back_Quad_Stretch", "Oblique_Crunches",
         )
         need(setOf(BENCH, PARTNER), "Hyperextensions_With_No_Hyperextension_Bench")
         need(setOf(ADJUSTABLE_BENCH), "Decline_Crunch", "Decline_Oblique_Crunch", "Decline_Reverse_Crunch")
