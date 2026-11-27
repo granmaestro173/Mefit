@@ -109,12 +109,13 @@ data class Workout(val type: TrainingType, val location: Location, val items: Li
         get() = items.mapNotNull { stationFor(it.exercise) }.distinct()
 
     val estimatedMinutes: Int
-        get() = items.sumOf {
-            when (it.exercise.category) {
+        get() = items.sumOf { item ->
+            val minutes: Int = when (item.exercise.category) {
                 "cardio" -> 12
                 "stretching" -> 3
                 else -> 8
             }
+            minutes
         }.coerceAtLeast(if (items.isEmpty()) 0 else 15)
 }
 
