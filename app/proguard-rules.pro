@@ -1,0 +1,3 @@
+-keepattributes *Annotation*, InnerClasses
+-keep,includedescriptorclasses class com.mefit.app.**$$serializer { *; }
+-keepclassmembers class com.mefit.app.** { *** Companion; }
