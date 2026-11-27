@@ -19,6 +19,7 @@ Built with Kotlin and Jetpack Compose (Material 3, dark theme). Requires Android
 ## Where the data comes from
 
 * **Exercises:** [free-exercise-db](https://github.com/yuhonas/free-exercise-db) is an open, **public-domain (Unlicense)** dataset of 876 exercises with instructions, muscles, equipment and images. The JSON is bundled in `app/src/main/assets/exercises.json`, so the library works offline. Images load from the project's GitHub over the internet.
+* **Equipment fixes:** free-exercise-db records only one piece of equipment per exercise. MeFit adds what's missing (`domain/Requirements.kt`): 54 hand-checked exercises tagged "bodyweight" or "no equipment" that really need a bench, pull-up bar, dip bars, Smith machine, partner, foam roller or jump rope, plus automatic bench, incline bench and rack detection for free-weight moves.
 * **Diet targets:** These use the Mifflin-St Jeor equation, protein of 1.6–2.0 g/kg (in line with sports-nutrition guidance such as the ISSN position stand) and about 25–33% of energy from fat. The meal plans are general templates written for the app. They are not medical advice.
 
 ## Build & run

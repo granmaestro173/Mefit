@@ -228,7 +228,12 @@ fun TodayScreen(
                 Panel {
                     Column(Modifier.padding(16.dp)) {
                         Text(
-                            "No exercises here yet. Add some below, or tick more equipment so MeFit can suggest a workout.",
+                            if (plan.exercises != null) "No exercises here yet. Add some below."
+                            else if (type == TrainingType.PULL || type == TrainingType.UPPER)
+                                "A ${type.label} session needs something to pull on: a pull-up bar, resistance bands " +
+                                    "or dumbbells. Tick one in My equipment, or change this day to Full body or Core."
+                            else "Your ticked equipment doesn't cover a ${type.label} session. " +
+                                "Tick more equipment, change the session type, or add exercises by hand.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         TextButton(onClick = { openEquipment(w.location) }) { Text("Edit my equipment") }

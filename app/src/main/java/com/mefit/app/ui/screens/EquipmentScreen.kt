@@ -132,7 +132,7 @@ fun EquipmentScreen(vm: AppViewModel, initial: Location, onBack: () -> Unit) {
                 }
             }
 
-            EquipmentGroup("Free weights & accessories", EquipmentCatalog.FREE_WEIGHTS, owned, ::write)
+            EquipmentCatalog.GROUPS.forEach { (title, items) -> EquipmentGroup(title, items, owned, ::write) }
             if (loc == Location.GYM) {
                 EquipmentGroup("Machines & stations", EquipmentCatalog.MACHINES, owned, ::write)
             } else {
@@ -151,7 +151,7 @@ fun EquipmentScreen(vm: AppViewModel, initial: Location, onBack: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Button(onClick = onBack, modifier = Modifier.weight(1f)) { Text("Done") }
                 TextButton(onClick = {
-                    write { if (loc == Location.GYM) EquipmentCatalog.ALL_KEYS else EquipmentCatalog.DEFAULT_HOME }
+                    write { if (loc == Location.GYM) EquipmentCatalog.GYM_DEFAULT else EquipmentCatalog.DEFAULT_HOME }
                 }) { Text("Reset to default") }
             }
             Spacer(Modifier.height(24.dp))

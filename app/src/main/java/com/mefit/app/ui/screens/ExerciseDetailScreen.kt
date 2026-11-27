@@ -46,7 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.mefit.app.domain.WorkoutGenerator
-import com.mefit.app.domain.stationFor
+import com.mefit.app.data.Location
 import com.mefit.app.ui.AppViewModel
 import com.mefit.app.ui.components.Panel
 import com.mefit.app.ui.components.SectionTitle
@@ -127,10 +127,30 @@ fun ExerciseDetailScreen(vm: AppViewModel, id: String, onBack: () -> Unit) {
                 ex.force?.let { Tag(it.titleCase()) }
             }
 
-            stationFor(ex)?.let { station ->
-                SectionTitle(if (ex.isMachine) "Machine" else "Equipment")
-                Panel {
-                    Text(station, Modifier.padding(16.dp), style = MaterialTheme.typography.titleMedium)
+            val needs = WorkoutGenerator.needs(ex)
+            SectionTitle("What you need")
+            Panel {
+                Column(Modifier.padding(16.dp)) {
+                    if (needs.isEmpty()) {
+                        Text("Nothing: bodyweight only", style = MaterialTheme.typography.titleMedium)
+                    } else {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            needs.forEach { Tag(it, Coral) }
+                        }
+                    }
+                    val gym = WorkoutGenerator.fits(ex, Location.GYM, settings)
+                    val home = WorkoutGenerator.fits(ex, Location.HOME, settings)
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        when {
+                            home && gym && !settings.homeOnly -> "✓ Fits your gym and your home equipment"
+                            home -> "✓ Fits your home equipment"
+                            gym && !settings.homeOnly -> "✓ Fits your gym · not possible with your home equipment"
+                            else -> "✗ Not possible with the equipment you've ticked"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (home || (gym && !settings.homeOnly)) Lime else MaterialTheme.colorScheme.secondary,
+                    )
                 }
             }
 

@@ -33,13 +33,20 @@ class LocalStore(context: Context) {
         val saved = prefs.getString(KEY_SETTINGS, null)
             ?.let { runCatching { json.decodeFromString<Settings>(it) }.getOrNull() }
             ?: return Settings(catalogVersion = EquipmentCatalog.CATALOG_VERSION)
-        // Version 2 added the pull-up bar: gyms have one, so give it to existing gym setups.
-        return if (saved.catalogVersion < 2) {
-            saved.copy(
-                gymEquipment = saved.gymEquipment + EquipmentCatalog.PULL_UP_BAR,
-                catalogVersion = EquipmentCatalog.CATALOG_VERSION,
+        // Newer catalog versions added equipment every gym has; give it to existing gym setups.
+        if (saved.catalogVersion >= EquipmentCatalog.CATALOG_VERSION) return saved
+        val added = buildSet {
+            if (saved.catalogVersion < 2) add(EquipmentCatalog.PULL_UP_BAR)
+            if (saved.catalogVersion < 3) addAll(
+                listOf(
+                    EquipmentCatalog.BENCH, EquipmentCatalog.ADJUSTABLE_BENCH, EquipmentCatalog.SQUAT_RACK,
+                    EquipmentCatalog.DIP_BARS, EquipmentCatalog.JUMP_ROPE,
+                ),
             )
-        } else saved
+        }
+        val migrated = saved.copy(gymEquipment = saved.gymEquipment + added, catalogVersion = EquipmentCatalog.CATALOG_VERSION)
+        saveSettings(migrated)
+        return migrated
     }
 
     fun saveSettings(settings: Settings) {

@@ -107,7 +107,7 @@ data class WorkoutItem(val exercise: Exercise, val prescription: Prescription)
 data class Workout(val type: TrainingType, val location: Location, val items: List<WorkoutItem>) {
     /** Distinct machines/stations needed, for the "Machines you'll use" section. */
     val stations: List<String>
-        get() = items.mapNotNull { stationFor(it.exercise) }.distinct()
+        get() = items.flatMap { WorkoutGenerator.needs(it.exercise) }.distinct()
 
     val estimatedMinutes: Int
         get() = items.sumOf { item ->
@@ -128,17 +128,27 @@ object WorkoutGenerator {
     /** Whether an exercise can be done at [location] with the equipment the user said they have there. */
     fun fits(ex: Exercise, location: Location, settings: Settings): Boolean {
         val owned = settings.equipmentFor(location)
-        return when (ex.equipment) {
-            "body only" -> !needsPullUpBar(ex) || EquipmentCatalog.PULL_UP_BAR in owned
+        val base = when (ex.equipment) {
+            "body only" -> true
             "machine", "cable" -> requiredMachine(ex)?.let { it in owned } ?: false
             null, "other" ->
-                // Stretches and simple cardio (jump rope, running outside) need nothing special.
-                ((ex.category == "stretching" || ex.category == "cardio") &&
-                    !ex.name.contains("Prowler", ignoreCase = true)) ||
-                    // Misc gym gear (sleds, landmines, pull-up stations…) assumed at a gym with machines.
+                // Stretches and simple cardio need nothing special (extra gear is listed in Requirements).
+                ex.category == "stretching" || ex.category == "cardio" ||
+                    // Misc gym gear (sleds, landmines…) assumed at a gym with machines.
                     (location == Location.GYM && EquipmentCatalog.OTHER_MACHINES in owned)
             else -> ex.equipment in owned
         }
+        return base && owned.containsAll(Requirements.of(ex))
+    }
+
+    /** Everything needed for [ex], as display labels (e.g. "Dumbbells", "Flat bench / sturdy box"). */
+    fun needs(ex: Exercise): List<String> {
+        val main = when (ex.equipment) {
+            "machine", "cable" -> listOfNotNull(requiredMachine(ex))
+            null, "other", "body only" -> emptyList()
+            else -> listOfNotNull(ex.equipment?.let { EquipmentCatalog.label(it) })
+        }
+        return (main + Requirements.of(ex).map { EquipmentCatalog.label(it) }).distinct()
     }
 
     /** The dataset tags pull-ups and chin-ups as bodyweight, but they need something to hang from. */

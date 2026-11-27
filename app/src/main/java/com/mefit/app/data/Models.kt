@@ -59,19 +59,40 @@ enum class Level(val label: String, val rank: Int) {
 data class EquipmentItem(val key: String, val label: String)
 
 object EquipmentCatalog {
+    const val OTHER_MACHINES = "Other machines"
+    const val PULL_UP_BAR = "pull-up bar"
+    const val BENCH = "bench"
+    const val ADJUSTABLE_BENCH = "adjustable bench"
+    const val SQUAT_RACK = "squat rack"
+    const val DIP_BARS = "dip bars"
+    const val JUMP_ROPE = "jump rope"
+    const val PARTNER = "partner"
+    const val BICYCLE = "bicycle"
+    const val SKATES = "skates"
+
     val FREE_WEIGHTS = listOf(
         EquipmentItem("dumbbell", "Dumbbells"),
         EquipmentItem("barbell", "Barbell & plates"),
         EquipmentItem("e-z curl bar", "EZ curl bar"),
         EquipmentItem("kettlebells", "Kettlebells"),
-        EquipmentItem("bands", "Resistance bands"),
         EquipmentItem("medicine ball", "Medicine ball"),
+    )
+    val BENCHES_AND_BARS = listOf(
+        EquipmentItem(BENCH, "Flat bench / sturdy box"),
+        EquipmentItem(ADJUSTABLE_BENCH, "Incline/decline bench"),
+        EquipmentItem(SQUAT_RACK, "Squat / power rack"),
+        EquipmentItem(PULL_UP_BAR, "Pull-up bar"),
+        EquipmentItem(DIP_BARS, "Dip bars"),
+    )
+    val ACCESSORIES = listOf(
+        EquipmentItem("bands", "Resistance bands"),
+        EquipmentItem(JUMP_ROPE, "Jump rope"),
         EquipmentItem("exercise ball", "Exercise ball"),
         EquipmentItem("foam roll", "Foam roller"),
-        EquipmentItem(PULL_UP_BAR, "Pull-up bar"),
+        EquipmentItem(BICYCLE, "Bicycle"),
+        EquipmentItem(SKATES, "Inline skates"),
+        EquipmentItem(PARTNER, "Training partner"),
     )
-    const val OTHER_MACHINES = "Other machines"
-    const val PULL_UP_BAR = "pull-up bar"
     val MACHINES = listOf(
         "Cable station", "Lat pulldown", "Seated cable row", "Smith machine", "Leg press",
         "Hack squat machine", "Leg curl machine", "Leg extension machine", "Calf raise machine",
@@ -79,8 +100,19 @@ object EquipmentCatalog {
         "Treadmill", "Stationary bike", "Rowing machine", "Elliptical", "Stair climber", OTHER_MACHINES,
     ).map { EquipmentItem(it, it) }
 
-    val ALL_KEYS: Set<String> = (FREE_WEIGHTS + MACHINES).map { it.key }.toSet()
+    /** Non-machine groups as shown on the equipment screen. */
+    val GROUPS: List<Pair<String, List<EquipmentItem>>> = listOf(
+        "Free weights" to FREE_WEIGHTS,
+        "Benches, racks & bars" to BENCHES_AND_BARS,
+        "Accessories & other" to ACCESSORIES,
+    )
+
+    private val ALL_ITEMS = FREE_WEIGHTS + BENCHES_AND_BARS + ACCESSORIES + MACHINES
+    val ALL_KEYS: Set<String> = ALL_ITEMS.map { it.key }.toSet()
     val MACHINE_KEYS: Set<String> = MACHINES.map { it.key }.toSet()
+
+    /** A typical commercial gym: everything except things a gym doesn't hand you. */
+    val GYM_DEFAULT: Set<String> = ALL_KEYS - setOf(PARTNER, BICYCLE, SKATES)
     val DEFAULT_HOME: Set<String> = setOf("dumbbell", "bands")
 
     /** One-tap setups for people training at home. */
@@ -88,14 +120,15 @@ object EquipmentCatalog {
         "Bodyweight only" to emptySet(),
         "Basic kit" to setOf("dumbbell", "bands"),
         "Full home gym" to setOf(
-            "dumbbell", "barbell", "kettlebells", "bands", PULL_UP_BAR, "exercise ball", "medicine ball", "foam roll",
+            "dumbbell", "barbell", "kettlebells", BENCH, ADJUSTABLE_BENCH, SQUAT_RACK, PULL_UP_BAR,
+            "bands", JUMP_ROPE, "exercise ball", "medicine ball", "foam roll",
         ),
     )
 
     /** Bump when new equipment is added so existing gym setups gain it (see LocalStore). */
-    const val CATALOG_VERSION = 2
+    const val CATALOG_VERSION = 3
 
-    fun label(key: String): String = (FREE_WEIGHTS + MACHINES).firstOrNull { it.key == key }?.label ?: key
+    fun label(key: String): String = ALL_ITEMS.firstOrNull { it.key == key }?.label ?: key
 }
 
 @Serializable
@@ -126,7 +159,7 @@ data class Settings(
     val level: String = Level.BEGINNER.name,
     val goal: String = Goal.MUSCLE.name,
     val homeEquipment: Set<String> = EquipmentCatalog.DEFAULT_HOME,
-    val gymEquipment: Set<String> = EquipmentCatalog.ALL_KEYS,
+    val gymEquipment: Set<String> = EquipmentCatalog.GYM_DEFAULT,
     val equipmentReviewed: Boolean = false,
     val homeOnly: Boolean = false,
     val catalogVersion: Int = 1,
