@@ -7,6 +7,8 @@ import com.mefit.app.data.DayPlan
 import com.mefit.app.data.Exercise
 import com.mefit.app.data.ExerciseRepository
 import com.mefit.app.data.LocalStore
+import com.mefit.app.data.Recipe
+import com.mefit.app.data.RecipeRepository
 import com.mefit.app.data.Location
 import com.mefit.app.data.Settings
 import com.mefit.app.domain.TrainingType
@@ -22,11 +24,15 @@ import java.time.LocalDate
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ExerciseRepository(app)
+    private val recipeRepo = RecipeRepository(app)
     private val store = LocalStore(app)
 
     private val _exercises = MutableStateFlow<List<Exercise>>(emptyList())
     val exercises: StateFlow<List<Exercise>> = _exercises.asStateFlow()
     private var byId: Map<String, Exercise> = emptyMap()
+
+    private val _recipes = MutableStateFlow<List<Recipe>>(emptyList())
+    val recipes: StateFlow<List<Recipe>> = _recipes.asStateFlow()
 
     private val _plans = MutableStateFlow(store.loadPlans())
     val plans: StateFlow<Map<String, DayPlan>> = _plans.asStateFlow()
@@ -40,9 +46,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             byId = list.associateBy { it.id }
             _exercises.value = list
         }
+        viewModelScope.launch { _recipes.value = recipeRepo.load() }
     }
 
     fun exercise(id: String): Exercise? = byId[id]
+
+    fun recipe(id: String): Recipe? = _recipes.value.firstOrNull { it.id == id }
+
+    fun toggleFavorite(id: String) = updateSettings {
+        it.copy(favoriteRecipes = if (id in it.favoriteRecipes) it.favoriteRecipes - id else it.favoriteRecipes + id)
+    }
 
     fun planFor(date: LocalDate): DayPlan? = _plans.value[date.toString()]
 

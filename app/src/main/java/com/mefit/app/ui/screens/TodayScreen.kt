@@ -79,6 +79,7 @@ import androidx.compose.material3.TextButton
 import com.mefit.app.domain.WorkoutItem
 import com.mefit.app.ui.components.ExercisePickerSheet
 import com.mefit.app.ui.components.ExerciseThumb
+import com.mefit.app.domain.RecipeMatcher
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -94,8 +95,10 @@ fun TodayScreen(
     openExercise: (String) -> Unit,
     openSettings: () -> Unit,
     openEquipment: (Location) -> Unit,
+    openRecipe: (String) -> Unit,
 ) {
     val exercises by vm.exercises.collectAsStateWithLifecycle()
+    val recipes by vm.recipes.collectAsStateWithLifecycle()
     val plans by vm.plans.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
     val plan = plans[date.toString()]
@@ -268,6 +271,15 @@ fun TodayScreen(
                     Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Add exercise")
+                }
+            }
+        }
+        val refuel = RecipeMatcher.suggest(recipes, listOf("post-workout"), settings.dietPlanId, date)
+        if (refuel != null && w.items.isNotEmpty()) {
+            item {
+                Column {
+                    SectionTitle("Refuel after training")
+                    RecipeCard(refuel, 0, refuel.id in settings.favoriteRecipes) { openRecipe(refuel.id) }
                 }
             }
         }

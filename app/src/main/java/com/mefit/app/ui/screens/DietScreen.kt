@@ -54,6 +54,8 @@ import com.mefit.app.ui.components.Tag
 import com.mefit.app.ui.theme.Coral
 import com.mefit.app.ui.theme.Lime
 import com.mefit.app.ui.theme.Sky
+import com.mefit.app.domain.RecipeMatcher
+import java.time.LocalDate
 import kotlin.math.roundToInt
 
 private val ProteinColor = Coral
@@ -62,8 +64,15 @@ private val FatColor = Color(0xFFFFD54F)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun DietScreen(vm: AppViewModel, openSettings: () -> Unit) {
+fun DietScreen(
+    vm: AppViewModel,
+    openSettings: () -> Unit,
+    openRecipes: () -> Unit,
+    openRecipe: (String) -> Unit,
+) {
     val settings by vm.settings.collectAsStateWithLifecycle()
+    val recipes by vm.recipes.collectAsStateWithLifecycle()
+    val today = LocalDate.now()
     val plan = dietPlan(settings.dietPlanId)
     val t = Nutrition.targets(settings, plan)
 
@@ -86,6 +95,20 @@ fun DietScreen(vm: AppViewModel, openSettings: () -> Unit) {
             }
         }
         item { TargetsCard(t, settings.bodyGoalEnum.label, Modifier.padding(horizontal = 20.dp)) }
+
+        item {
+            SectionTitle("Gym recipes for ${plan.name}", Modifier.padding(horizontal = 20.dp)) {
+                TextButton(onClick = openRecipes) { Text("See all") }
+            }
+        }
+        item {
+            val picks = recipes.filter { RecipeMatcher.fitsPlan(it, plan.id) }.sortedByDescending { it.protein }.take(8)
+            LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(picks, key = { it.id }) { r ->
+                    RecipeCard(r, t.proteinG, r.id in settings.favoriteRecipes, Modifier.width(300.dp)) { openRecipe(r.id) }
+                }
+            }
+        }
 
         item { SectionTitle("Choose a diet style", Modifier.padding(horizontal = 20.dp)) }
         item {
@@ -113,6 +136,30 @@ fun DietScreen(vm: AppViewModel, openSettings: () -> Unit) {
                                     Box(Modifier.size(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurfaceVariant))
                                     Spacer(Modifier.width(10.dp))
                                     Text(food, style = MaterialTheme.typography.bodyMedium)
+                                }
+                            }
+                            val idea = RecipeMatcher.suggest(
+                                recipes, RecipeMatcher.mealsForSlot(meal.name), plan.id, today, salt = meal.name.length,
+                            )
+                            if (idea != null) {
+                                Row(
+                                    Modifier
+                                        .padding(top = 10.dp)
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Lime.copy(alpha = 0.08f))
+                                        .clickable { openRecipe(idea.id) }
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(mealIcon(idea.meal), contentDescription = null, tint = Lime, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text("Recipe idea", style = MaterialTheme.typography.labelSmall, color = Lime)
+                                        Text(idea.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                    }
+                                    Text("${idea.kcal} kcal · P ${idea.protein}g", style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }

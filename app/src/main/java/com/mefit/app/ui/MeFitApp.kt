@@ -33,6 +33,8 @@ import com.mefit.app.ui.screens.DietScreen
 import com.mefit.app.ui.screens.EquipmentScreen
 import com.mefit.app.ui.screens.ExerciseDetailScreen
 import com.mefit.app.ui.screens.LibraryScreen
+import com.mefit.app.ui.screens.RecipeDetailScreen
+import com.mefit.app.ui.screens.RecipesScreen
 import com.mefit.app.ui.screens.SettingsScreen
 import com.mefit.app.ui.screens.TodayScreen
 import com.mefit.app.data.Location
@@ -86,6 +88,7 @@ fun MeFitApp(vm: AppViewModel = viewModel()) {
                     openExercise = { nav.navigate("exercise/$it") },
                     openSettings = { nav.navigate("settings") },
                     openEquipment = { nav.navigate("equipment/${it.name}") },
+                    openRecipe = { nav.navigate("recipe/$it") },
                 )
             }
             composable("calendar") {
@@ -102,7 +105,18 @@ fun MeFitApp(vm: AppViewModel = viewModel()) {
                 LibraryScreen(vm = vm, openExercise = { nav.navigate("exercise/$it") })
             }
             composable("diet") {
-                DietScreen(vm = vm, openSettings = { nav.navigate("settings") })
+                DietScreen(
+                    vm = vm,
+                    openSettings = { nav.navigate("settings") },
+                    openRecipes = { nav.navigate("recipes") },
+                    openRecipe = { nav.navigate("recipe/$it") },
+                )
+            }
+            composable("recipes") {
+                RecipesScreen(vm = vm, onBack = { nav.popBackStack() }, openRecipe = { nav.navigate("recipe/$it") })
+            }
+            composable("recipe/{id}") { entry ->
+                RecipeDetailScreen(vm = vm, id = entry.arguments?.getString("id").orEmpty(), onBack = { nav.popBackStack() })
             }
             composable("settings") {
                 SettingsScreen(vm = vm, onBack = { nav.popBackStack() }, openEquipment = { nav.navigate("equipment/GYM") })

@@ -170,6 +170,7 @@ data class Settings(
     val activity: String = Activity.MODERATE.name,
     val bodyGoal: String = BodyGoal.MAINTAIN.name,
     val dietPlanId: String = "balanced",
+    val favoriteRecipes: Set<String> = emptySet(),
 ) {
     val levelEnum get() = runCatching { Level.valueOf(level) }.getOrDefault(Level.BEGINNER)
     val goalEnum get() = runCatching { Goal.valueOf(goal) }.getOrDefault(Goal.MUSCLE)
@@ -180,3 +181,24 @@ data class Settings(
     fun equipmentFor(location: Location): Set<String> =
         if (location == Location.GYM && !homeOnly) gymEquipment else homeEquipment
 }
+
+/** A MeFit recipe. Nutrition is per serving, calculated from USDA FoodData Central (SR Legacy). */
+@Serializable
+data class Recipe(
+    val id: String,
+    val name: String,
+    val meal: String,           // breakfast, pre-workout, post-workout, lunch, dinner, snack
+    val minutes: Int,
+    val servings: Int,
+    val tags: List<String> = emptyList(),
+    val blurb: String = "",
+    val ingredients: List<RecipeIngredient> = emptyList(),
+    val steps: List<String> = emptyList(),
+    val kcal: Int,
+    val protein: Int,
+    val carbs: Int,
+    val fat: Int,
+)
+
+@Serializable
+data class RecipeIngredient(val label: String, val grams: Int, val usda: String)
