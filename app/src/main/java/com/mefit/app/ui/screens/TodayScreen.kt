@@ -146,7 +146,9 @@ fun TodayScreen(
         }
 
         if (plan == null) {
-            item { QuickPlan(onPick = { type, loc -> vm.setPlan(date, DayPlan(type.name, loc.name)) }) }
+            item {
+                QuickPlan(homeOnly = settings.homeOnly, onPick = { type, loc -> vm.setPlan(date, DayPlan(type.name, loc.name)) })
+            }
             return@LazyColumn
         }
 
@@ -163,7 +165,9 @@ fun TodayScreen(
                     val next = if (plan.location == Location.GYM.name) Location.HOME else Location.GYM
                     vm.setPlan(date, plan.copy(location = next.name, exercises = null))
                 },
-                onEquipment = { openEquipment(if (plan.location == Location.HOME.name) Location.HOME else Location.GYM) },
+                onEquipment = { openEquipment(vm.locationOf(plan)) },
+                location = vm.locationOf(plan),
+                homeOnly = settings.homeOnly,
             )
         }
         if (plan.note.isNotBlank()) {
@@ -265,7 +269,7 @@ fun TodayScreen(
         item { Spacer(Modifier.height(16.dp)) }
     }
 
-    val where = if (plan?.location == Location.HOME.name) "home" else "gym"
+    val where = if (plan == null || vm.locationOf(plan) == Location.HOME) "home" else "gym"
     swapFor?.let { oldId ->
         val options = remember(oldId, plan, settings, exercises) { vm.alternatives(date, oldId) }
         ExercisePickerSheet(
@@ -452,8 +456,10 @@ private fun HeroCard(
     onShuffle: () -> Unit,
     onSwitchLocation: () -> Unit,
     onEquipment: () -> Unit,
+    location: Location,
+    homeOnly: Boolean,
 ) {
-    val isGym = plan.location == Location.GYM.name
+    val isGym = location == Location.GYM
     Box(
         Modifier
             .fillMaxWidth()
@@ -480,7 +486,7 @@ private fun HeroCard(
                         Modifier
                             .clip(RoundedCornerShape(50))
                             .background(Color.Black.copy(alpha = 0.25f))
-                            .clickable(onClick = onSwitchLocation)
+                            .then(if (homeOnly) Modifier else Modifier.clickable(onClick = onSwitchLocation))
                             .padding(horizontal = 12.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -545,8 +551,9 @@ private fun HeroCard(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun QuickPlan(onPick: (TrainingType, Location) -> Unit) {
-    var loc by rememberSaveable { mutableStateOf(Location.GYM) }
+private fun QuickPlan(homeOnly: Boolean, onPick: (TrainingType, Location) -> Unit) {
+    var picked by rememberSaveable { mutableStateOf(Location.GYM) }
+    val loc = if (homeOnly) Location.HOME else picked
     Panel(Modifier.padding(top = 8.dp)) {
         Column(Modifier.padding(18.dp)) {
             Text("Nothing planned for this day", style = MaterialTheme.typography.titleLarge)
@@ -558,9 +565,11 @@ private fun QuickPlan(onPick: (TrainingType, Location) -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(14.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ChoiceChip("Gym", loc == Location.GYM, { loc = Location.GYM }, Icons.Rounded.LocationCity)
-                ChoiceChip("Home", loc == Location.HOME, { loc = Location.HOME }, Icons.Rounded.Home)
+            if (!homeOnly) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ChoiceChip("Gym", loc == Location.GYM, { picked = Location.GYM }, Icons.Rounded.LocationCity)
+                    ChoiceChip("Home", loc == Location.HOME, { picked = Location.HOME }, Icons.Rounded.Home)
+                }
             }
             Spacer(Modifier.height(10.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

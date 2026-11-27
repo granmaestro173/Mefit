@@ -129,7 +129,7 @@ object WorkoutGenerator {
     fun fits(ex: Exercise, location: Location, settings: Settings): Boolean {
         val owned = settings.equipmentFor(location)
         return when (ex.equipment) {
-            "body only" -> true
+            "body only" -> !needsPullUpBar(ex) || EquipmentCatalog.PULL_UP_BAR in owned
             "machine", "cable" -> requiredMachine(ex)?.let { it in owned } ?: false
             null, "other" ->
                 // Stretches and simple cardio (jump rope, running outside) need nothing special.
@@ -139,6 +139,12 @@ object WorkoutGenerator {
                     (location == Location.GYM && EquipmentCatalog.OTHER_MACHINES in owned)
             else -> ex.equipment in owned
         }
+    }
+
+    /** The dataset tags pull-ups and chin-ups as bodyweight, but they need something to hang from. */
+    fun needsPullUpBar(ex: Exercise): Boolean {
+        val n = ex.name.lowercase().replace("-", "").replace(" ", "")
+        return "pullup" in n || "chinup" in n || "muscleup" in n || "hangingleg" in n || "hangingpike" in n
     }
 
     /** The machine/station key a machine or cable exercise needs, or null for free-weight moves. */
@@ -258,6 +264,7 @@ fun stationFor(ex: Exercise): String? {
         ex.equipment == "exercise ball" -> "Exercise ball"
         ex.equipment == "medicine ball" -> "Medicine ball"
         ex.equipment == "foam roll" -> "Foam roller"
+        ex.equipment == "body only" && WorkoutGenerator.needsPullUpBar(ex) -> "Pull-up bar"
         else -> null
     }
 }

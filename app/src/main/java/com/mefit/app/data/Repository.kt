@@ -29,10 +29,18 @@ class LocalStore(context: Context) {
         prefs.edit().putString(KEY_PLANS, json.encodeToString(plans)).apply()
     }
 
-    fun loadSettings(): Settings =
-        prefs.getString(KEY_SETTINGS, null)
+    fun loadSettings(): Settings {
+        val saved = prefs.getString(KEY_SETTINGS, null)
             ?.let { runCatching { json.decodeFromString<Settings>(it) }.getOrNull() }
-            ?: Settings()
+            ?: return Settings(catalogVersion = EquipmentCatalog.CATALOG_VERSION)
+        // Version 2 added the pull-up bar: gyms have one, so give it to existing gym setups.
+        return if (saved.catalogVersion < 2) {
+            saved.copy(
+                gymEquipment = saved.gymEquipment + EquipmentCatalog.PULL_UP_BAR,
+                catalogVersion = EquipmentCatalog.CATALOG_VERSION,
+            )
+        } else saved
+    }
 
     fun saveSettings(settings: Settings) {
         prefs.edit().putString(KEY_SETTINGS, json.encodeToString(settings)).apply()

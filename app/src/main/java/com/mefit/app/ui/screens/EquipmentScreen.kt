@@ -21,6 +21,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -53,7 +54,7 @@ fun EquipmentScreen(vm: AppViewModel, initial: Location, onBack: () -> Unit) {
     val s by vm.settings.collectAsStateWithLifecycle()
     val exercises by vm.exercises.collectAsStateWithLifecycle()
     var locName by rememberSaveable { mutableStateOf(initial.name) }
-    val loc = Location.valueOf(locName)
+    val loc = if (s.homeOnly) Location.HOME else Location.valueOf(locName)
     val owned = s.equipmentFor(loc)
     val available = remember(exercises, s, loc) { vm.countAvailable(loc, s) }
 
@@ -80,11 +81,41 @@ fun EquipmentScreen(vm: AppViewModel, initial: Location, onBack: () -> Unit) {
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp),
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ChoiceChip("My gym", loc == Location.GYM, { locName = Location.GYM.name }, Icons.Rounded.LocationCity)
-                ChoiceChip("My home", loc == Location.HOME, { locName = Location.HOME.name }, Icons.Rounded.Home)
+            Panel {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("I only train at home", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "No gym: every day in your plan becomes a home workout.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = s.homeOnly, onCheckedChange = { on -> vm.updateSettings { it.copy(homeOnly = on) } })
+                }
             }
             Spacer(Modifier.height(12.dp))
+            if (!s.homeOnly) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ChoiceChip("My gym", loc == Location.GYM, { locName = Location.GYM.name }, Icons.Rounded.LocationCity)
+                    ChoiceChip("My home", loc == Location.HOME, { locName = Location.HOME.name }, Icons.Rounded.Home)
+                }
+                Spacer(Modifier.height(12.dp))
+            }
+            if (loc == Location.HOME) {
+                Text(
+                    "QUICK SETUP",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 6.dp),
+                )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    EquipmentCatalog.HOME_PRESETS.forEach { (name, keys) ->
+                        ChoiceChip(name, owned == keys, { write { keys } })
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+            }
             Panel {
                 Column(Modifier.padding(16.dp)) {
                     Text(
@@ -102,10 +133,19 @@ fun EquipmentScreen(vm: AppViewModel, initial: Location, onBack: () -> Unit) {
             }
 
             EquipmentGroup("Free weights & accessories", EquipmentCatalog.FREE_WEIGHTS, owned, ::write)
-            EquipmentGroup(
-                if (loc == Location.GYM) "Machines & stations" else "Machines (if you have any at home)",
-                EquipmentCatalog.MACHINES, owned, ::write,
-            )
+            if (loc == Location.GYM) {
+                EquipmentGroup("Machines & stations", EquipmentCatalog.MACHINES, owned, ::write)
+            } else {
+                // Most homes have no machines; keep the list tucked away unless asked for.
+                var showMachines by rememberSaveable { mutableStateOf(owned.any { it in EquipmentCatalog.MACHINE_KEYS }) }
+                if (showMachines) {
+                    EquipmentGroup("Machines at home", EquipmentCatalog.MACHINES, owned, ::write)
+                } else {
+                    TextButton(onClick = { showMachines = true }, modifier = Modifier.padding(top = 8.dp)) {
+                        Text("I have a machine at home (treadmill, bike, cable…)")
+                    }
+                }
+            }
 
             Spacer(Modifier.height(20.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -144,4 +184,5 @@ private fun EquipmentGroup(
 
 /** Short summary like "Gym: 24 items · Home: 2 items". */
 fun equipmentSummary(s: Settings): String =
-    "Gym: ${s.gymEquipment.size} items · Home: ${s.homeEquipment.size} items"
+    if (s.homeOnly) "Home only · ${if (s.homeEquipment.isEmpty()) "bodyweight" else "${s.homeEquipment.size} items"}"
+    else "Gym: ${s.gymEquipment.size} items · Home: ${s.homeEquipment.size} items"

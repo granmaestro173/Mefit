@@ -76,7 +76,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val existing = next[d.toString()]
                 if (existing?.done == true) continue
                 val (type, loc) = template.days[i % 7]
-                next[d.toString()] = DayPlan(type.name, loc.name)
+                val where = if (_settings.value.homeOnly) Location.HOME else loc
+                next[d.toString()] = DayPlan(type.name, where.name)
             }
             next
         }
@@ -108,8 +109,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return WorkoutGenerator.generate(_exercises.value, type, loc, _settings.value, seed)
     }
 
-    private fun locationOf(plan: DayPlan): Location =
-        runCatching { Location.valueOf(plan.location) }.getOrDefault(Location.GYM)
+    /** Where this day actually happens: always home when the user has said they don't use a gym. */
+    fun locationOf(plan: DayPlan): Location =
+        if (_settings.value.homeOnly) Location.HOME
+        else runCatching { Location.valueOf(plan.location) }.getOrDefault(Location.GYM)
 
     /** Edits a day's exercise list; the first edit freezes the auto-generated list so it can be changed. */
     private fun editExercises(date: LocalDate, transform: (List<String>) -> List<String>) {

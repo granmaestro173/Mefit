@@ -154,6 +154,7 @@ fun CalendarScreen(vm: AppViewModel, openEquipment: (Location) -> Unit, openDay:
                 date = date,
                 existing = plans[dateStr],
                 equipmentCount = { loc -> settings.equipmentFor(loc).size },
+                homeOnly = settings.homeOnly,
                 onEquipment = { loc -> editing = null; openEquipment(loc) },
                 onSave = { vm.setPlan(date, it); editing = null },
                 onClear = { vm.setPlan(date, null); editing = null },
@@ -174,6 +175,7 @@ fun CalendarScreen(vm: AppViewModel, openEquipment: (Location) -> Unit, openDay:
         ) {
             TemplatePicker(
                 month = month,
+                homeOnly = settings.homeOnly,
                 onApply = { index, weeks ->
                     val now = LocalDate.now()
                     val start = if (YearMonth.from(now) == month) now else month.atDay(1)
@@ -275,14 +277,18 @@ private fun DayEditor(
     date: LocalDate,
     existing: DayPlan?,
     equipmentCount: (Location) -> Int,
+    homeOnly: Boolean,
     onEquipment: (Location) -> Unit,
     onSave: (DayPlan) -> Unit,
     onClear: () -> Unit,
     onOpen: (DayPlan) -> Unit,
 ) {
     var type by remember(date) { mutableStateOf(existing?.let { TrainingType.of(it.type) } ?: TrainingType.FULL_BODY) }
-    var loc by remember(date) {
-        mutableStateOf(existing?.location?.let { runCatching { Location.valueOf(it) }.getOrNull() } ?: Location.GYM)
+    var loc by remember(date, homeOnly) {
+        mutableStateOf(
+            if (homeOnly) Location.HOME
+            else existing?.location?.let { runCatching { Location.valueOf(it) }.getOrNull() } ?: Location.GYM,
+        )
     }
     var note by remember(date) { mutableStateOf(existing?.note.orEmpty()) }
     var done by remember(date) { mutableStateOf(existing?.done ?: false) }
@@ -290,7 +296,7 @@ private fun DayEditor(
     fun current(): DayPlan {
         val base = existing ?: DayPlan(type.name)
         // A different session type or place means the hand-picked exercises no longer apply.
-        val keepCustom = existing != null && existing.type == type.name && existing.location == loc.name
+        val keepCustom = existing != null && existing.type == type.name && (homeOnly || existing.location == loc.name)
         return base.copy(
             type = type.name, location = loc.name, note = note, done = done,
             exercises = if (keepCustom) existing?.exercises else null,
@@ -335,9 +341,11 @@ private fun DayEditor(
         )
         if (type != TrainingType.REST) {
             SectionTitle("Where")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ChoiceChip("Gym", loc == Location.GYM, { loc = Location.GYM }, Icons.Rounded.LocationCity)
-                ChoiceChip("Home", loc == Location.HOME, { loc = Location.HOME }, Icons.Rounded.Home)
+            if (!homeOnly) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ChoiceChip("Gym", loc == Location.GYM, { loc = Location.GYM }, Icons.Rounded.LocationCity)
+                    ChoiceChip("Home", loc == Location.HOME, { loc = Location.HOME }, Icons.Rounded.Home)
+                }
             }
             Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -348,7 +356,7 @@ private fun DayEditor(
                 )
                 TextButton(onClick = { onEquipment(loc) }) { Text("Edit equipment") }
             }
-            if (existing?.exercises != null && existing.type == type.name && existing.location == loc.name) {
+            if (existing?.exercises != null && existing.type == type.name && (homeOnly || existing.location == loc.name)) {
                 Text(
                     "You've customized this day's exercises. Changing the session or place resets them.",
                     style = MaterialTheme.typography.bodySmall,
@@ -383,8 +391,10 @@ private fun DayEditor(
 }
 
 @Composable
-private fun TemplatePicker(month: YearMonth, onApply: (Int, Int) -> Unit) {
-    var selected by remember { mutableIntStateOf(0) }
+private fun TemplatePicker(month: YearMonth, homeOnly: Boolean, onApply: (Int, Int) -> Unit) {
+    var selected by remember {
+        mutableIntStateOf(if (homeOnly) WEEK_TEMPLATES.indexOfFirst { it.name == "Home only" }.coerceAtLeast(0) else 0)
+    }
     var weeks by remember { mutableIntStateOf(4) }
     val isCurrent = YearMonth.from(LocalDate.now()) == month
     Column(
@@ -396,7 +406,7 @@ private fun TemplatePicker(month: YearMonth, onApply: (Int, Int) -> Unit) {
     ) {
         Text("Auto-plan your training", style = MaterialTheme.typography.headlineSmall)
         Text(
-            "Fills days starting from ${if (isCurrent) "this week" else "the first week of " + month.format(DateTimeFormatter.ofPattern("MMMM"))}. " +
+            (if (homeOnly) "Home-only mode: every day becomes a home workout. " else "") + "Fills days starting from ${if (isCurrent) "this week" else "the first week of " + month.format(DateTimeFormatter.ofPattern("MMMM"))}. " +
                 "Days you've already completed are kept.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -433,7 +443,7 @@ private fun TemplatePicker(month: YearMonth, onApply: (Int, Int) -> Unit) {
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Text(type.short, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = type.uiColor)
-                            Text(if (type == TrainingType.REST) " " else if (loc == Location.GYM) "gym" else "home", fontSize = 8.sp,
+                            Text(if (type == TrainingType.REST) " " else if (loc == Location.GYM && !homeOnly) "gym" else "home", fontSize = 8.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }

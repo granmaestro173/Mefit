@@ -108,7 +108,9 @@ fun LibraryScreen(vm: AppViewModel, openExercise: (String) -> Unit) {
         item {
             LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 item { ChoiceChip("Anywhere", where == null, { where = null }) }
-                item { ChoiceChip("My gym", where == Location.GYM.name, { where = Location.GYM.name }, Icons.Rounded.LocationCity) }
+                if (!settings.homeOnly) {
+                    item { ChoiceChip("My gym", where == Location.GYM.name, { where = Location.GYM.name }, Icons.Rounded.LocationCity) }
+                }
                 item { ChoiceChip("My home", where == Location.HOME.name, { where = Location.HOME.name }, Icons.Rounded.Home) }
             }
         }

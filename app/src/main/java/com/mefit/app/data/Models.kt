@@ -68,8 +68,10 @@ object EquipmentCatalog {
         EquipmentItem("medicine ball", "Medicine ball"),
         EquipmentItem("exercise ball", "Exercise ball"),
         EquipmentItem("foam roll", "Foam roller"),
+        EquipmentItem(PULL_UP_BAR, "Pull-up bar"),
     )
     const val OTHER_MACHINES = "Other machines"
+    const val PULL_UP_BAR = "pull-up bar"
     val MACHINES = listOf(
         "Cable station", "Lat pulldown", "Seated cable row", "Smith machine", "Leg press",
         "Hack squat machine", "Leg curl machine", "Leg extension machine", "Calf raise machine",
@@ -80,6 +82,18 @@ object EquipmentCatalog {
     val ALL_KEYS: Set<String> = (FREE_WEIGHTS + MACHINES).map { it.key }.toSet()
     val MACHINE_KEYS: Set<String> = MACHINES.map { it.key }.toSet()
     val DEFAULT_HOME: Set<String> = setOf("dumbbell", "bands")
+
+    /** One-tap setups for people training at home. */
+    val HOME_PRESETS: List<Pair<String, Set<String>>> = listOf(
+        "Bodyweight only" to emptySet(),
+        "Basic kit" to setOf("dumbbell", "bands"),
+        "Full home gym" to setOf(
+            "dumbbell", "barbell", "kettlebells", "bands", PULL_UP_BAR, "exercise ball", "medicine ball", "foam roll",
+        ),
+    )
+
+    /** Bump when new equipment is added so existing gym setups gain it (see LocalStore). */
+    const val CATALOG_VERSION = 2
 
     fun label(key: String): String = (FREE_WEIGHTS + MACHINES).firstOrNull { it.key == key }?.label ?: key
 }
@@ -114,6 +128,8 @@ data class Settings(
     val homeEquipment: Set<String> = EquipmentCatalog.DEFAULT_HOME,
     val gymEquipment: Set<String> = EquipmentCatalog.ALL_KEYS,
     val equipmentReviewed: Boolean = false,
+    val homeOnly: Boolean = false,
+    val catalogVersion: Int = 1,
     val sex: String = Sex.MALE.name,
     val age: Int = 28,
     val heightCm: Int = 175,
@@ -129,5 +145,5 @@ data class Settings(
     val bodyGoalEnum get() = runCatching { BodyGoal.valueOf(bodyGoal) }.getOrDefault(BodyGoal.MAINTAIN)
 
     fun equipmentFor(location: Location): Set<String> =
-        if (location == Location.GYM) gymEquipment else homeEquipment
+        if (location == Location.GYM && !homeOnly) gymEquipment else homeEquipment
 }
