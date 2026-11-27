@@ -30,10 +30,12 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.mefit.app.ui.screens.CalendarScreen
 import com.mefit.app.ui.screens.DietScreen
+import com.mefit.app.ui.screens.EquipmentScreen
 import com.mefit.app.ui.screens.ExerciseDetailScreen
 import com.mefit.app.ui.screens.LibraryScreen
 import com.mefit.app.ui.screens.SettingsScreen
 import com.mefit.app.ui.screens.TodayScreen
+import com.mefit.app.data.Location
 import java.time.LocalDate
 
 private data class Tab(val route: String, val label: String, val icon: ImageVector)
@@ -83,11 +85,13 @@ fun MeFitApp(vm: AppViewModel = viewModel()) {
                     onDateChange = { focusDate = it.toString() },
                     openExercise = { nav.navigate("exercise/$it") },
                     openSettings = { nav.navigate("settings") },
+                    openEquipment = { nav.navigate("equipment/${it.name}") },
                 )
             }
             composable("calendar") {
                 CalendarScreen(
                     vm = vm,
+                    openEquipment = { nav.navigate("equipment/${it.name}") },
                     openDay = { date ->
                         focusDate = date.toString()
                         nav.switchTab("today")
@@ -101,7 +105,12 @@ fun MeFitApp(vm: AppViewModel = viewModel()) {
                 DietScreen(vm = vm, openSettings = { nav.navigate("settings") })
             }
             composable("settings") {
-                SettingsScreen(vm = vm, onBack = { nav.popBackStack() })
+                SettingsScreen(vm = vm, onBack = { nav.popBackStack() }, openEquipment = { nav.navigate("equipment/GYM") })
+            }
+            composable("equipment/{loc}") { entry ->
+                val loc = runCatching { Location.valueOf(entry.arguments?.getString("loc").orEmpty()) }
+                    .getOrDefault(Location.GYM)
+                EquipmentScreen(vm = vm, initial = loc, onBack = { nav.popBackStack() })
             }
             composable("exercise/{id}") { entry ->
                 ExerciseDetailScreen(

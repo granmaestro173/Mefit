@@ -26,6 +26,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _exercises = MutableStateFlow<List<Exercise>>(emptyList())
     val exercises: StateFlow<List<Exercise>> = _exercises.asStateFlow()
+    private var byId: Map<String, Exercise> = emptyMap()
 
     private val _plans = MutableStateFlow(store.loadPlans())
     val plans: StateFlow<Map<String, DayPlan>> = _plans.asStateFlow()
@@ -34,10 +35,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val settings: StateFlow<Settings> = _settings.asStateFlow()
 
     init {
-        viewModelScope.launch { _exercises.value = repo.load() }
+        viewModelScope.launch {
+            val list = repo.load()
+            byId = list.associateBy { it.id }
+            _exercises.value = list
+        }
     }
 
-    fun exercise(id: String): Exercise? = _exercises.value.firstOrNull { it.id == id }
+    fun exercise(id: String): Exercise? = byId[id]
 
     fun planFor(date: LocalDate): DayPlan? = _plans.value[date.toString()]
 
@@ -57,7 +62,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun shuffle(date: LocalDate) {
         val p = planFor(date) ?: return
-        setPlan(date, p.copy(shuffle = p.shuffle + 1))
+        setPlan(date, p.copy(shuffle = p.shuffle + 1, exercises = null))
     }
 
     /** Fills [weeks] weeks starting from the Monday of [from]'s week; keeps days already marked done. */
@@ -95,8 +100,83 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun workoutFor(date: LocalDate, plan: DayPlan): Workout {
         val type = TrainingType.of(plan.type)
-        val loc = runCatching { Location.valueOf(plan.location) }.getOrDefault(Location.GYM)
+        val loc = locationOf(plan)
+        plan.exercises?.let { ids ->
+            return WorkoutGenerator.fromIds(byId, ids, type, loc, _settings.value)
+        }
         val seed = date.toEpochDay() * 31 + type.ordinal * 7 + plan.shuffle * 101
         return WorkoutGenerator.generate(_exercises.value, type, loc, _settings.value, seed)
+    }
+
+    private fun locationOf(plan: DayPlan): Location =
+        runCatching { Location.valueOf(plan.location) }.getOrDefault(Location.GYM)
+
+    /** Edits a day's exercise list; the first edit freezes the auto-generated list so it can be changed. */
+    private fun editExercises(date: LocalDate, transform: (List<String>) -> List<String>) {
+        val plan = planFor(date) ?: return
+        val current = plan.exercises ?: workoutFor(date, plan).items.map { it.exercise.id }
+        setPlan(date, plan.copy(exercises = transform(current).distinct()))
+    }
+
+    fun removeExercise(date: LocalDate, id: String) = editExercises(date) { it - id }
+
+    fun addExercise(date: LocalDate, id: String) = editExercises(date) { it + id }
+
+    fun swapExercise(date: LocalDate, oldId: String, newId: String) =
+        editExercises(date) { list -> list.map { if (it == oldId) newId else it } }
+
+    fun moveExercise(date: LocalDate, id: String, delta: Int) = editExercises(date) { list ->
+        val i = list.indexOf(id)
+        val j = i + delta
+        if (i < 0 || j !in list.indices) list
+        else list.toMutableList().apply { add(j, removeAt(i)) }
+    }
+
+    fun resetExercises(date: LocalDate) {
+        val plan = planFor(date) ?: return
+        setPlan(date, plan.copy(exercises = null))
+    }
+
+    /** Alternatives for [id]: same main muscle and kind of exercise, doable with this day's equipment. */
+    fun alternatives(date: LocalDate, id: String): List<Exercise> {
+        val plan = planFor(date) ?: return emptyList()
+        val ex = byId[id] ?: return emptyList()
+        val loc = locationOf(plan)
+        val inUse = workoutFor(date, plan).items.map { it.exercise.id }.toSet()
+        val kind = kindOf(ex.category)
+        return _exercises.value.filter { c ->
+            c.id !in inUse && kindOf(c.category) == kind &&
+                c.primaryMuscles.any { it in ex.primaryMuscles } &&
+                WorkoutGenerator.fits(c, loc, _settings.value)
+        }.sortedWith(
+            compareByDescending<Exercise> { it.primaryMuscles.firstOrNull() == ex.primaryMuscles.firstOrNull() }
+                .thenBy { it.name },
+        )
+    }
+
+    /** Everything doable on this day's equipment, exercises for the session's muscles first. */
+    fun addable(date: LocalDate): List<Exercise> {
+        val plan = planFor(date) ?: return emptyList()
+        val loc = locationOf(plan)
+        val type = TrainingType.of(plan.type)
+        val targets = WorkoutGenerator.targetMuscles(type)
+        val cats = type.slots.flatMap { it.categories }.toSet()
+        val inUse = workoutFor(date, plan).items.map { it.exercise.id }.toSet()
+        return _exercises.value.filter { it.id !in inUse && WorkoutGenerator.fits(it, loc, _settings.value) }
+            .sortedWith(
+                compareByDescending<Exercise> {
+                    (targets.isEmpty() || it.primaryMuscles.any { m -> m in targets }) && it.category in cats
+                }.thenBy { it.name },
+            )
+    }
+
+    /** How many exercises the user's equipment unlocks at [location]. */
+    fun countAvailable(location: Location, settings: Settings): Int =
+        _exercises.value.count { WorkoutGenerator.fits(it, location, settings) }
+
+    private fun kindOf(category: String?): String = when (category) {
+        "stretching" -> "stretch"
+        "cardio", "plyometrics" -> "cardio"
+        else -> "strength"
     }
 }

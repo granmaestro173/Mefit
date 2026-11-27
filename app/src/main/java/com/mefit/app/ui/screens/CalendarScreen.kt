@@ -77,7 +77,8 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun CalendarScreen(vm: AppViewModel, openDay: (LocalDate) -> Unit) {
+fun CalendarScreen(vm: AppViewModel, openEquipment: (Location) -> Unit, openDay: (LocalDate) -> Unit) {
+    val settings by vm.settings.collectAsStateWithLifecycle()
     val plans by vm.plans.collectAsStateWithLifecycle()
     var monthStr by rememberSaveable { mutableStateOf(YearMonth.now().toString()) }
     val month = YearMonth.parse(monthStr)
@@ -152,6 +153,8 @@ fun CalendarScreen(vm: AppViewModel, openDay: (LocalDate) -> Unit) {
             DayEditor(
                 date = date,
                 existing = plans[dateStr],
+                equipmentCount = { loc -> settings.equipmentFor(loc).size },
+                onEquipment = { loc -> editing = null; openEquipment(loc) },
                 onSave = { vm.setPlan(date, it); editing = null },
                 onClear = { vm.setPlan(date, null); editing = null },
                 onOpen = { plan ->
@@ -271,6 +274,8 @@ private fun DayCell(date: LocalDate, plan: DayPlan?, isToday: Boolean, onClick: 
 private fun DayEditor(
     date: LocalDate,
     existing: DayPlan?,
+    equipmentCount: (Location) -> Int,
+    onEquipment: (Location) -> Unit,
     onSave: (DayPlan) -> Unit,
     onClear: () -> Unit,
     onOpen: (DayPlan) -> Unit,
@@ -282,7 +287,15 @@ private fun DayEditor(
     var note by remember(date) { mutableStateOf(existing?.note.orEmpty()) }
     var done by remember(date) { mutableStateOf(existing?.done ?: false) }
 
-    fun current() = (existing ?: DayPlan(type.name)).copy(type = type.name, location = loc.name, note = note, done = done)
+    fun current(): DayPlan {
+        val base = existing ?: DayPlan(type.name)
+        // A different session type or place means the hand-picked exercises no longer apply.
+        val keepCustom = existing != null && existing.type == type.name && existing.location == loc.name
+        return base.copy(
+            type = type.name, location = loc.name, note = note, done = done,
+            exercises = if (keepCustom) existing?.exercises else null,
+        )
+    }
 
     Column(
         Modifier
@@ -325,6 +338,22 @@ private fun DayEditor(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ChoiceChip("Gym", loc == Location.GYM, { loc = Location.GYM }, Icons.Rounded.LocationCity)
                 ChoiceChip("Home", loc == Location.HOME, { loc = Location.HOME }, Icons.Rounded.Home)
+            }
+            Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Uses your ${if (loc == Location.GYM) "gym" else "home"} equipment (${equipmentCount(loc)} items)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = { onEquipment(loc) }) { Text("Edit equipment") }
+            }
+            if (existing?.exercises != null && existing.type == type.name && existing.location == loc.name) {
+                Text(
+                    "You've customized this day's exercises. Changing the session or place resets them.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Lime,
+                )
             }
         }
         SectionTitle("Note")

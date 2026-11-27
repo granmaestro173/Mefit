@@ -16,6 +16,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,7 +39,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mefit.app.data.Activity
 import com.mefit.app.data.BodyGoal
 import com.mefit.app.data.Goal
-import com.mefit.app.data.HomeEquipment
 import com.mefit.app.data.Level
 import com.mefit.app.data.Sex
 import com.mefit.app.ui.AppViewModel
@@ -48,7 +48,7 @@ import com.mefit.app.ui.components.SectionTitle
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
+fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit, openEquipment: () -> Unit) {
     val s by vm.settings.collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize()) {
@@ -86,19 +86,18 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
                 RadioLine(g.label, g.blurb, s.goalEnum == g) { vm.updateSettings { it.copy(goal = g.name) } }
             }
 
-            SectionTitle("Equipment I have at home")
-            Text(
-                "Bodyweight moves are always included. Home workouts only use what you tick here.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 8.dp),
-            )
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                HomeEquipment.entries.forEach { e ->
-                    val on = e.key in s.homeEquipment
-                    ChoiceChip(e.label, on, {
-                        vm.updateSettings { it.copy(homeEquipment = if (on) it.homeEquipment - e.key else it.homeEquipment + e.key) }
-                    })
+            SectionTitle("My equipment")
+            Panel(onClick = openEquipment) {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Gym & home equipment", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            equipmentSummary(s),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Icon(Icons.Rounded.ChevronRight, contentDescription = null)
                 }
             }
 

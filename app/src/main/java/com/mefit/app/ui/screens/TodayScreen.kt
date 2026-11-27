@@ -66,6 +66,19 @@ import com.mefit.app.ui.components.uiColor
 import com.mefit.app.ui.theme.Coral
 import com.mefit.app.ui.theme.Lime
 import com.mefit.app.ui.theme.Sky
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.FitnessCenter
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.SwapHoriz
+import androidx.compose.material3.TextButton
+import com.mefit.app.domain.WorkoutItem
+import com.mefit.app.ui.components.ExercisePickerSheet
+import com.mefit.app.ui.components.ExerciseThumb
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -80,6 +93,7 @@ fun TodayScreen(
     onDateChange: (LocalDate) -> Unit,
     openExercise: (String) -> Unit,
     openSettings: () -> Unit,
+    openEquipment: (Location) -> Unit,
 ) {
     val exercises by vm.exercises.collectAsStateWithLifecycle()
     val plans by vm.plans.collectAsStateWithLifecycle()
@@ -90,6 +104,9 @@ fun TodayScreen(
     }
     // Per-session ticks for individual exercises (reset when the date changes).
     var ticked by rememberSaveable(date.toString()) { mutableStateOf(setOf<String>()) }
+    var editing by rememberSaveable(date.toString()) { mutableStateOf(false) }
+    var swapFor by rememberSaveable(date.toString()) { mutableStateOf<String?>(null) }
+    var adding by rememberSaveable(date.toString()) { mutableStateOf(false) }
 
     LazyColumn(
         Modifier.fillMaxSize(),
@@ -99,6 +116,25 @@ fun TodayScreen(
         item { Header(settings.name, date, openSettings) }
         item { WeekStrip(date, plans, onDateChange) }
         item { MonthStats(plans, date) }
+        if (!settings.equipmentReviewed) {
+            item {
+                Panel(onClick = { openEquipment(Location.GYM) }) {
+                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.FitnessCenter, contentDescription = null, tint = Lime)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Tell MeFit what equipment you have", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                "Tick the machines at your gym and what you own at home. Every workout will use only those.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Icon(Icons.Rounded.ChevronRight, contentDescription = null)
+                    }
+                }
+            }
+        }
 
         if (exercises.isEmpty()) {
             item {
@@ -125,8 +161,9 @@ fun TodayScreen(
                 onShuffle = { vm.shuffle(date) },
                 onSwitchLocation = {
                     val next = if (plan.location == Location.GYM.name) Location.HOME else Location.GYM
-                    vm.setPlan(date, plan.copy(location = next.name))
+                    vm.setPlan(date, plan.copy(location = next.name, exercises = null))
                 },
+                onEquipment = { openEquipment(if (plan.location == Location.HOME.name) Location.HOME else Location.GYM) },
             )
         }
         if (plan.note.isNotBlank()) {
@@ -165,30 +202,137 @@ fun TodayScreen(
             }
         }
         item {
-            SectionTitle("Workout · ${ticked.size}/${w.items.size} done")
+            SectionTitle(if (editing) "Edit workout" else "Workout · ${ticked.size}/${w.items.size} done") {
+                TextButton(onClick = { editing = !editing }) {
+                    Icon(if (editing) Icons.Rounded.Check else Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(if (editing) "Done" else "Edit")
+                }
+            }
+        }
+        if (plan.exercises != null) {
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Tag("Customized by you", Lime)
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = { vm.resetExercises(date) }) { Text("Reset to suggested") }
+                }
+            }
         }
         if (w.items.isEmpty()) {
             item {
                 Panel {
+                    Column(Modifier.padding(16.dp)) {
+                        Text(
+                            "No exercises here yet. Add some below, or tick more equipment so MeFit can suggest a workout.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        TextButton(onClick = { openEquipment(w.location) }) { Text("Edit my equipment") }
+                    }
+                }
+            }
+        }
+        itemsIndexed(w.items, key = { _, wi -> wi.exercise.id }) { index, item ->
+            val id = item.exercise.id
+            if (editing) {
+                EditableRow(
+                    item = item,
+                    canMoveUp = index > 0,
+                    canMoveDown = index < w.items.lastIndex,
+                    onMove = { vm.moveExercise(date, id, it) },
+                    onSwap = { swapFor = id },
+                    onRemove = { vm.removeExercise(date, id) },
+                )
+            } else {
+                ExerciseRow(
+                    exercise = item.exercise,
+                    prescription = item.prescription,
+                    checked = id in ticked,
+                    onCheck = { ticked = if (id in ticked) ticked - id else ticked + id },
+                    onClick = { openExercise(id) },
+                )
+            }
+        }
+        if (editing || w.items.isEmpty()) {
+            item {
+                OutlinedButton(onClick = { adding = true }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Add exercise")
+                }
+            }
+        }
+        item { Spacer(Modifier.height(16.dp)) }
+    }
+
+    val where = if (plan?.location == Location.HOME.name) "home" else "gym"
+    swapFor?.let { oldId ->
+        val options = remember(oldId, plan, settings, exercises) { vm.alternatives(date, oldId) }
+        ExercisePickerSheet(
+            title = "Swap ${vm.exercise(oldId)?.name ?: "exercise"}",
+            subtitle = "Same muscles, using only your $where equipment",
+            candidates = options,
+            onPick = { vm.swapExercise(date, oldId, it.id); swapFor = null },
+            onDismiss = { swapFor = null },
+        )
+    }
+    if (adding) {
+        val options = remember(plan, settings, exercises) { vm.addable(date) }
+        ExercisePickerSheet(
+            title = "Add an exercise",
+            subtitle = "Best matches for this session first, using only your $where equipment",
+            candidates = options,
+            onPick = { vm.addExercise(date, it.id); adding = false },
+            onDismiss = { adding = false },
+        )
+    }
+}
+
+@Composable
+private fun EditableRow(
+    item: WorkoutItem,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onMove: (Int) -> Unit,
+    onSwap: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    Panel {
+        Column(Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ExerciseThumb(item.exercise, 48)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(item.exercise.name, style = MaterialTheme.typography.titleMedium, maxLines = 2)
                     Text(
-                        "No matching exercises for your equipment. Add home equipment in Settings or switch to Gym.",
-                        Modifier.padding(16.dp),
+                        item.exercise.equipmentLabel + "  •  ${item.prescription.sets} × ${item.prescription.reps}",
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
+            Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.End) {
+                IconButton(onClick = { onMove(-1) }, enabled = canMoveUp) {
+                    Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = "Move up")
+                }
+                IconButton(onClick = { onMove(1) }, enabled = canMoveDown) {
+                    Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "Move down")
+                }
+                TextButton(onClick = onSwap) {
+                    Icon(Icons.Rounded.SwapHoriz, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Swap")
+                }
+                TextButton(onClick = onRemove) {
+                    Icon(
+                        Icons.Rounded.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.secondary,
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text("Remove", color = MaterialTheme.colorScheme.secondary)
+                }
+            }
         }
-        items(w.items, key = { it.exercise.id }) { item ->
-            val id = item.exercise.id
-            ExerciseRow(
-                exercise = item.exercise,
-                prescription = item.prescription,
-                checked = id in ticked,
-                onCheck = { ticked = if (id in ticked) ticked - id else ticked + id },
-                onClick = { openExercise(id) },
-            )
-        }
-        item { Spacer(Modifier.height(16.dp)) }
     }
 }
 
@@ -307,6 +451,7 @@ private fun HeroCard(
     onToggleDone: () -> Unit,
     onShuffle: () -> Unit,
     onSwitchLocation: () -> Unit,
+    onEquipment: () -> Unit,
 ) {
     val isGym = plan.location == Location.GYM.name
     Box(
@@ -357,6 +502,19 @@ private fun HeroCard(
                         Spacer(Modifier.width(6.dp))
                         Text("~$minutes min · $exerciseCount moves", style = MaterialTheme.typography.labelLarge)
                     }
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.Black.copy(alpha = 0.25f))
+                        .clickable(onClick = onEquipment)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Rounded.FitnessCenter, contentDescription = null, modifier = Modifier.size(16.dp), tint = Lime)
+                    Spacer(Modifier.width(6.dp))
+                    Text("My ${if (isGym) "gym" else "home"} equipment", style = MaterialTheme.typography.labelLarge)
                 }
             }
             Spacer(Modifier.height(16.dp))

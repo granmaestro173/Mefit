@@ -1,5 +1,6 @@
 package com.mefit.app.domain
 
+import com.mefit.app.data.EquipmentCatalog
 import com.mefit.app.data.Exercise
 import com.mefit.app.data.Goal
 import com.mefit.app.data.Level
@@ -124,17 +125,30 @@ object WorkoutGenerator {
 
     private val GYM_ONLY = setOf("machine", "cable", "barbell", "e-z curl bar")
 
-    /** Whether an exercise can be done at [location] with the user's equipment. */
-    fun fits(ex: Exercise, location: Location, settings: Settings): Boolean = when (location) {
-        Location.GYM -> true
-        Location.HOME -> when {
-            ex.equipment == "body only" -> true
-            ex.equipment != null && ex.equipment in settings.homeEquipment -> true
-            // Stretches and simple cardio (jump rope, running outside) tagged "other"/none need nothing special.
-            (ex.category == "stretching" || ex.category == "cardio") &&
-                (ex.equipment == null || ex.equipment == "other") &&
-                !ex.name.contains("Prowler", ignoreCase = true) -> true
-            else -> false
+    /** Whether an exercise can be done at [location] with the equipment the user said they have there. */
+    fun fits(ex: Exercise, location: Location, settings: Settings): Boolean {
+        val owned = settings.equipmentFor(location)
+        return when (ex.equipment) {
+            "body only" -> true
+            "machine", "cable" -> requiredMachine(ex)?.let { it in owned } ?: false
+            null, "other" ->
+                // Stretches and simple cardio (jump rope, running outside) need nothing special.
+                ((ex.category == "stretching" || ex.category == "cardio") &&
+                    !ex.name.contains("Prowler", ignoreCase = true)) ||
+                    // Misc gym gear (sleds, landmines, pull-up stations…) assumed at a gym with machines.
+                    (location == Location.GYM && EquipmentCatalog.OTHER_MACHINES in owned)
+            else -> ex.equipment in owned
+        }
+    }
+
+    /** The machine/station key a machine or cable exercise needs, or null for free-weight moves. */
+    fun requiredMachine(ex: Exercise): String? {
+        if (ex.equipment != "machine" && ex.equipment != "cable") return null
+        val station = stationFor(ex)
+        return when {
+            station != null && station in EquipmentCatalog.MACHINE_KEYS -> station
+            ex.equipment == "cable" -> "Cable station"
+            else -> EquipmentCatalog.OTHER_MACHINES
         }
     }
 
@@ -184,6 +198,20 @@ object WorkoutGenerator {
         }
         return Workout(type, location, items)
     }
+
+    fun fromIds(
+        byId: Map<String, Exercise>,
+        ids: List<String>,
+        type: TrainingType,
+        location: Location,
+        settings: Settings,
+    ): Workout = Workout(
+        type, location,
+        ids.mapNotNull { byId[it] }.map { WorkoutItem(it, prescriptionFor(it, settings.goalEnum)) },
+    )
+
+    /** Muscles a session type targets, for suggesting exercises to add. */
+    fun targetMuscles(type: TrainingType): Set<String> = type.slots.flatMap { it.muscles.orEmpty() }.toSet()
 
     fun prescriptionFor(ex: Exercise, goal: Goal): Prescription = when (ex.category) {
         "stretching" -> Prescription("2", "30–45 s hold", "15 s")

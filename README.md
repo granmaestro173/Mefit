@@ -12,7 +12,9 @@ Built with Kotlin and Jetpack Compose (Material 3, dark theme). Requires Android
 | **Plan** | A custom month calendar. Tap any day to choose one of 10 session types (Push, Pull, Legs, Upper, Lower, Full body, Core, Cardio & HIIT, Mobility, Rest), gym or home, add a note, or mark it complete. **Auto-plan** fills 1–8 weeks from a template: PPL, Upper/Lower, Full body 3x, Home only, or Hybrid. |
 | **Exercises** | Search and filter by gym machines and weights, home (your equipment), muscle, equipment or type. The detail page shows an animated start/end demo, the machine needed, muscles worked, step-by-step instructions and suggested sets and reps. |
 | **Diet** | Daily calories (Mifflin-St Jeor × activity, adjusted for your goal), protein/carb/fat targets and water. There are 6 diet styles (Balanced, High-protein cut, Lean bulk, Mediterranean, Vegetarian, Budget) with a sample day scaled to your calories, key principles, and what to eat more of or limit. |
-| **Settings** (gear icon) | Name, level, training goal (strength, muscle or endurance), the equipment you own at home, and your body profile for the diet targets. |
+| **My equipment** | Two lists: **My gym** (free weights plus 19 machines and stations, such as cable station, lat pulldown, leg press, Smith machine and treadmill) and **My home**. Every planned and daily workout uses only what you've ticked. A live counter shows how many exercises your setup unlocks. |
+| **Edit a day** | On Today, tap **Edit** to swap an exercise for another one that works the same muscles with your equipment, remove an exercise, add one, or reorder them. Your edits are saved for that day; tap **Reset to suggested** to undo them. |
+| **Settings** (gear icon) | Name, level, training goal (strength, muscle or endurance), equipment, and your body profile for the diet targets. |
 
 ## Where the data comes from
 

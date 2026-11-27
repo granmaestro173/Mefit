@@ -67,7 +67,7 @@ fun LibraryScreen(vm: AppViewModel, openExercise: (String) -> Unit) {
                 (category == null || ex.category == category) &&
                 when (where) {
                     Location.HOME.name -> WorkoutGenerator.fits(ex, Location.HOME, settings)
-                    Location.GYM.name -> WorkoutGenerator.isGymOnly(ex)
+                    Location.GYM.name -> WorkoutGenerator.fits(ex, Location.GYM, settings)
                     else -> true
                 }
         }
@@ -108,8 +108,8 @@ fun LibraryScreen(vm: AppViewModel, openExercise: (String) -> Unit) {
         item {
             LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 item { ChoiceChip("Anywhere", where == null, { where = null }) }
-                item { ChoiceChip("Gym machines & weights", where == Location.GYM.name, { where = Location.GYM.name }, Icons.Rounded.LocationCity) }
-                item { ChoiceChip("Home (my equipment)", where == Location.HOME.name, { where = Location.HOME.name }, Icons.Rounded.Home) }
+                item { ChoiceChip("My gym", where == Location.GYM.name, { where = Location.GYM.name }, Icons.Rounded.LocationCity) }
+                item { ChoiceChip("My home", where == Location.HOME.name, { where = Location.HOME.name }, Icons.Rounded.Home) }
             }
         }
         item { FilterRow("Muscle", MUSCLES, muscle) { muscle = it } }

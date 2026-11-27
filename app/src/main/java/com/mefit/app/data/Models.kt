@@ -52,14 +52,36 @@ enum class Level(val label: String, val rank: Int) {
     }
 }
 
-/** Equipment someone might have at home (dataset equipment keys). */
-enum class HomeEquipment(val key: String, val label: String) {
-    DUMBBELL("dumbbell", "Dumbbells"),
-    KETTLEBELL("kettlebells", "Kettlebells"),
-    BANDS("bands", "Resistance bands"),
-    EXERCISE_BALL("exercise ball", "Exercise ball"),
-    MEDICINE_BALL("medicine ball", "Medicine ball"),
-    FOAM_ROLL("foam roll", "Foam roller"),
+/**
+ * Everything MeFit can ask "do you have this?" about. Free-weight keys match the dataset's
+ * `equipment` field; machine keys are station names (see domain.stationFor).
+ */
+data class EquipmentItem(val key: String, val label: String)
+
+object EquipmentCatalog {
+    val FREE_WEIGHTS = listOf(
+        EquipmentItem("dumbbell", "Dumbbells"),
+        EquipmentItem("barbell", "Barbell & plates"),
+        EquipmentItem("e-z curl bar", "EZ curl bar"),
+        EquipmentItem("kettlebells", "Kettlebells"),
+        EquipmentItem("bands", "Resistance bands"),
+        EquipmentItem("medicine ball", "Medicine ball"),
+        EquipmentItem("exercise ball", "Exercise ball"),
+        EquipmentItem("foam roll", "Foam roller"),
+    )
+    const val OTHER_MACHINES = "Other machines"
+    val MACHINES = listOf(
+        "Cable station", "Lat pulldown", "Seated cable row", "Smith machine", "Leg press",
+        "Hack squat machine", "Leg curl machine", "Leg extension machine", "Calf raise machine",
+        "Pec deck", "Plate-loaded lever machine", "Dip machine", "Hip abductor / adductor",
+        "Treadmill", "Stationary bike", "Rowing machine", "Elliptical", "Stair climber", OTHER_MACHINES,
+    ).map { EquipmentItem(it, it) }
+
+    val ALL_KEYS: Set<String> = (FREE_WEIGHTS + MACHINES).map { it.key }.toSet()
+    val MACHINE_KEYS: Set<String> = MACHINES.map { it.key }.toSet()
+    val DEFAULT_HOME: Set<String> = setOf("dumbbell", "bands")
+
+    fun label(key: String): String = (FREE_WEIGHTS + MACHINES).firstOrNull { it.key == key }?.label ?: key
 }
 
 @Serializable
@@ -69,6 +91,7 @@ data class DayPlan(
     val done: Boolean = false,
     val note: String = "",
     val shuffle: Int = 0,         // bumps the generator seed when the user asks for a new workout
+    val exercises: List<String>? = null, // user-edited exercise ids for this day; null = auto-generated
 )
 
 enum class Sex(val label: String) { MALE("Male"), FEMALE("Female") }
@@ -88,7 +111,9 @@ data class Settings(
     val name: String = "",
     val level: String = Level.BEGINNER.name,
     val goal: String = Goal.MUSCLE.name,
-    val homeEquipment: Set<String> = setOf(HomeEquipment.DUMBBELL.key, HomeEquipment.BANDS.key),
+    val homeEquipment: Set<String> = EquipmentCatalog.DEFAULT_HOME,
+    val gymEquipment: Set<String> = EquipmentCatalog.ALL_KEYS,
+    val equipmentReviewed: Boolean = false,
     val sex: String = Sex.MALE.name,
     val age: Int = 28,
     val heightCm: Int = 175,
@@ -102,4 +127,7 @@ data class Settings(
     val sexEnum get() = runCatching { Sex.valueOf(sex) }.getOrDefault(Sex.MALE)
     val activityEnum get() = runCatching { Activity.valueOf(activity) }.getOrDefault(Activity.MODERATE)
     val bodyGoalEnum get() = runCatching { BodyGoal.valueOf(bodyGoal) }.getOrDefault(BodyGoal.MAINTAIN)
+
+    fun equipmentFor(location: Location): Set<String> =
+        if (location == Location.GYM) gymEquipment else homeEquipment
 }
